@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音乐播放器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#e8e8ed 0%,#d1d1d6 50%,#c9c9ce 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;transition:background 0.5s;}
+body.dark{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);}
+.player-container{width:400px;max-height:90vh;background:rgba(255,255,255,0.25);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-radius:24px;border:1px solid rgba(255,255,255,0.18);box-shadow:0 8px 32px rgba(0,0,0,0.1);padding:24px;display:flex;flex-direction:column;gap:16px;overflow:hidden;}
+.dark .player-container{background:rgba(30,30,60,0.35);border-color:rgba(255,255,255,0.08);}
+.cover-section{width:100%;aspect-ratio:1;border-radius:16px;overflow:hidden;background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;}
+.cover-section img{width:100%;height:100%;object-fit:cover;}
+.cover-section .no-cover{font-size:64px;opacity:0.3;}
+.info-section{text-align:center;}
+.info-section .title{font-size:18px;font-weight:600;color:#1a1a2e;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dark .info-section .title{color:#e0e0ff;}
+.info-section .artist{font-size:14px;color:#6366f1;opacity:0.8;}
+.dark .info-section .artist{color:#a5a8ff;}
+.progress-section{display:flex;flex-direction:column;gap:8px;}
+.progress-bar{width:100%;height:4px;background:rgba(99,102,241,0.2);border-radius:2px;cursor:pointer;position:relative;}
+.progress-bar .progress{height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:2px;transition:width 0.1s;}
+.time-display{display:flex;justify-content:space-between;font-size:12px;color:#666;}
+.dark .time-display{color:#aaa;}
+.controls-section{display:flex;align-items:center;justify-content:center;gap:24px;}
+.controls-section button{background:none;border:none;cursor:pointer;font-size:24px;color:#6366f1;transition:transform 0.2s;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
+.controls-section button:hover{transform:scale(1.1);background:rgba(99,102,241,0.1);}
+.controls-section button.play-btn{width:56px;height:56px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;font-size:28px;box-shadow:0 4px 15px rgba(99,102,241,0.4);}
+.controls-section button.play-btn:hover{transform:scale(1.05);box-shadow:0 6px 20px rgba(99,102,241,0.5);}
+.playlist-section{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:8px;max-height:200px;}
+.playlist-section h3{font-size:14px;color:#666;font-weight:500;}
+.dark .playlist-section h3{color:#aaa;}
+.playlist-list{overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
+.playlist-item{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:12px;cursor:pointer;transition:background 0.2s;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.1);}
+.playlist-item:hover{background:rgba(99,102,241,0.1);}
+.playlist-item.active{background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.3);}
+.dark .playlist-item{background:rgba(129,140,248,0.08);border-color:rgba(129,140,248,0.15);}
+.dark .playlist-item:hover{background:rgba(129,140,248,0.15);}
+.dark .playlist-item.active{background:rgba(129,140,248,0.2);border-color:rgba(129,140,248,0.3);}
+.playlist-item .index{font-size:13px;color:#6366f1;font-weight:600;min-width:20px;}
+.dark .playlist-item .index{color:#a5a8ff;}
+.playlist-item .info{flex:1;overflow:hidden;}
+.playlist-item .info .name{font-size:13px;font-weight:500;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dark .playlist-item .info .name{color:#e0e0ff;}
+.playlist-item .info .artist{font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dark .playlist-item .info .artist{color:#aaa;}
+.import-section{display:flex;gap:8px;}
+.import-section button{flex:1;padding:10px;border:1px solid rgba(99,102,241,0.3);border-radius:12px;background:rgba(99,102,241,0.05);color:#6366f1;font-size:13px;cursor:pointer;transition:background 0.2s;}
+.import-section button:hover{background:rgba(99,102,241,0.15);}
+.dark .import-section button{border-color:rgba(129,140,248,0.3);background:rgba(129,140,248,0.08);color:#a5a8ff;}
+.lyrics-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);backdrop-filter:blur(30px);z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;padding:40px;}
+.lyrics-overlay.show{display:flex;}
+.lyrics-overlay .lyrics-container{width:100%;max-width:600px;height:70vh;overflow-y:auto;text-align:center;scroll-behavior:smooth;}
+.lyrics-overlay .lyric-line{font-size:18px;color:rgba(255,255,255,0.4);padding:8px 0;transition:color 0.3s,font-size 0.3s;}
+.lyrics-overlay .lyric-line.active{color:white;font-size:22px;font-weight:600;}
+.lyrics-overlay .close-btn{position:absolute;top:20px;right:20px;background:none;border:none;color:white;font-size:28px;cursor:pointer;}
+.theme-toggle{position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:18px;backdrop-filter:blur(10px);}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+<div class="player-container">
+  <div class="cover-section" id="coverSection">
+    <div class="no-cover">🎵</div>
+  </div>
+  <div class="info-section">
+    <div class="title" id="titleText">未选择音乐</div>
+    <div class="artist" id="artistText">请导入音乐文件</div>
+  </div>
+  <div class="progress-section">
+    <div class="progress-bar" id="progressBar" onclick="seekTo(event)">
+      <div class="progress" id="progress"></div>
+    </div>
+    <div class="time-display">
+      <span id="currentTime">0:00</span>
+      <span id="totalTime">0:00</span>
+    </div>
+  </div>
+  <div class="controls-section">
+    <button onclick="prevTrack()" title="上一首">⏮</button>
+    <button class="play-btn" id="playBtn" onclick="togglePlay()" title="播放">▶</button>
+    <button onclick="nextTrack()" title="下一首">⏭</button>
+  </div>
+  <div class="import-section">
+    <button onclick="document.getElementById('fileInput').click()">📁 选择文件</button>
+    <button onclick="showLyrics()" id="lyricsBtn">📃 歌词</button>
+  </div>
+  <div class="playlist-section">
+    <h3>播放列表 (<span id="playlistCount">0</span>)</h3>
+    <div class="playlist-list" id="playlistList"></div>
+  </div>
+</div>
+<div class="lyrics-overlay" id="lyricsOverlay">
+  <button class="close-btn" onclick="hideLyrics()">✕</button>
+  <div class="lyrics-container" id="lyricsContainer"></div>
+</div>
+<input type="file" id="fileInput" multiple accept="audio/*" style="display:none" onchange="handleFiles(event)">
+<audio id="audioEl"></audio>
+<script>
+// ============ jsmediatags (embedded) ============
+// (嵌入 jsmediatags 代码，约 53KB，这里用 CDN 方式)
+</script>
+<script src="jsmediatags.min.js"></script>
+<script>
+// ============ State ============
+let tracks = [];
+let currentIndex = -1;
+let isPlaying = false;
+let lyricsData = [];
+let audio = document.getElementById('audioEl');
+
+// ============ Theme ============
+function toggleTheme(){
+  document.body.classList.toggle('dark');
+  localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+  document.querySelector('.theme-toggle').textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+}
+if(localStorage.getItem('theme') === 'dark') toggleTheme();
+
+// ============ File Handling ============
+function handleFiles(event){
+  const files = Array.from(event.target.files);
+  files.forEach(f => readFile(f));
+}
+function readFile(file){
+  // Read tags
+  jsmediatags.read(file, {
+    onSuccess: function(tag) {
+      const tags = tag.tags;
+      const url = URL.createObjectURL(file);
+      const track = {
+        id: Date.now() + Math.random(),
+        title: tags.title || file.name.replace(/\.[^.]+$/, ''),
+        artist: tags.artist || '未知艺术家',
+        album: tags.album || '未知专辑',
+        year: tags.year || '',
+        url: url,
+        cover: null,
+        lyrics: ''
+      };
+      // Extract cover
+      if(tags.picture){
+        const pic = tags.picture;
+        const blob = new Blob([new Uint8Array(pic.data)], {type: pic.format});
+        track.cover = URL.createObjectURL(blob);
+      }
+      // Extract lyrics
+      if(tags.lyrics){
+        track.lyrics = tags.lyrics;
+      }
+      tracks.push(track);
+      updatePlaylist();
+      if(currentIndex === -1){
+        playTrack(0);
+      }
+    },
+    onError: function(error) {
+      console.warn('Tag read error:', error);
+      // Still add track with basic info
+      const url = URL.createObjectURL(file);
+      const track = {
+        id: Date.now() + Math.random(),
+        title: file.name.replace(/\.[^.]+$/, ''),
+        artist: '未知艺术家',
+        album: '未知专辑',
+        year: '',
+        url: url,
+        cover: null,
+        lyrics: ''
+      };
+      tracks.push(track);
+      updatePlaylist();
+      if(currentIndex === -1){
+        playTrack(0);
+      }
+    }
+  });
+}
+
+// ============ Playback ============
+function playTrack(index){
+  if(index < 0 || index >= tracks.length) return;
+  currentIndex = index;
+  const track = tracks[index];
+  audio.src = track.url;
+  audio.play();
+  isPlaying = true;
+  updateUI();
+  updatePlaylist();
+  parseLyrics(track.lyrics);
+}
+function togglePlay(){
+  if(currentIndex === -1 && tracks.length > 0){
+    playTrack(0);
+    return;
+  }
+  if(isPlaying){
+    audio.pause();
+  } else {
+    audio.play();
+  }
+  isPlaying = !isPlaying;
+  updatePlayBtn();
+}
+function prevTrack(){
+  if(tracks.length === 0) return;
+  playTrack((currentIndex - 1 + tracks.length) % tracks.length);
+}
+function nextTrack(){
+  if(tracks.length === 0) return;
+  playTrack((currentIndex + 1) % tracks.length);
+}
+function seekTo(e){
+  const bar = document.getElementById('progressBar');
+  const rect = bar.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = pct * audio.duration;
+}
+
+// ============ UI Update ============
+function updateUI(){
+  const track = tracks[currentIndex];
+  if(!track) return;
+  document.getElementById('titleText').textContent = track.title;
+  document.getElementById('artistText').textContent = track.artist + (track.album ? ' · ' + track.album : '');
+  // Cover
+  const coverSection = document.getElementById('coverSection');
+  if(track.cover){
+    coverSection.innerHTML = '<img src="' + track.cover + '">';
+  } else {
+    coverSection.innerHTML = '<div class="no-cover">🎵</div>';
+  }
+  updatePlayBtn();
+  document.getElementById('lyricsBtn').style.display = track.lyrics ? 'block' : 'none';
+}
+function updatePlayBtn(){
+  document.getElementById('playBtn').textContent = isPlaying ? '⏸' : '▶';
+}
+function updatePlaylist(){
+  const list = document.getElementById('playlistList');
+  list.innerHTML = '';
+  tracks.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'playlist-item' + (i === currentIndex ? ' active' : '');
+    div.innerHTML = '<span class="index">' + (i + 1) + '</span><div class="info"><div class="name">' + t.title + '</div><div class="artist">' + t.artist + '</div></div>';
+    div.onclick = () => playTrack(i);
+    list.appendChild(div);
+  });
+  document.getElementById('playlistCount').textContent = tracks.length;
+}
+
+// ============ Lyrics ============
+function parseLyrics(lrc){
+  lyricsData = [];
+  if(!lrc) return;
+  const lines = lrc.split('\n');
+  lines.forEach(line => {
+    const match = line.match(/\[(\d+):(\d+)\.(\d+)\](.*)/);
+    if(match){
+      const time = parseInt(match[1]) * 60 + parseInt(match[2]) + parseInt(match[3]) / 100;
+      const text = match[4].trim();
+      if(text) lyricsData.push({time, text});
+    }
+  });
+  lyricsData.sort((a, b) => a.time - b.time);
+}
+function showLyrics(){
+  const overlay = document.getElementById('lyricsOverlay');
+  overlay.classList.add('show');
+  const container = document.getElementById('lyricsContainer');
+  if(lyricsData.length === 0){
+    container.innerHTML = '<div style="color:rgba(255,255,255,0.5);margin-top:40vh;">暂无歌词</div>';
+    return;
+  }
+  container.innerHTML = lyricsData.map(l => '<div class="lyric-line" data-time="' + l.time + '">' + l.text + '</div>').join('');
+}
+function hideLyrics(){
+  document.getElementById('lyricsOverlay').classList.remove('show');
+}
+function updateLyricsHighlight(){
+  if(lyricsData.length === 0) return;
+  const currentTime = audio.currentTime;
+  let activeIdx = -1;
+  for(let i = lyricsData.length - 1; i >= 0; i--){
+    if(currentTime >= lyricsData[i].time){
+      activeIdx = i;
+      break;
+    }
+  }
+  const lines = document.querySelectorAll('.lyric-line');
+  lines.forEach((l, i) => {
+    l.classList.toggle('active', i === activeIdx);
+    if(i === activeIdx){
+      l.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  });
+}
+
+// ============ Audio Events ============
+audio.addEventListener('timeupdate', () => {
+  const pct = audio.duration ? (audio.currentTime / audio.duration * 100) : 0;
+  document.getElementById('progress').style.width = pct + '%';
+  document.getElementById('currentTime').textContent = formatTime(audio.currentTime);
+  updateLyricsHighlight();
+});
+audio.addEventListener('loadedmetadata', () => {
+  document.getElementById('totalTime').textContent = formatTime(audio.duration);
+});
+audio.addEventListener('ended', () => {
+  nextTrack();
+});
+function formatTime(s){
+  if(!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+// ============ Drag & Drop ============
+document.addEventListener('dragover', e => { e.preventDefault(); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'));
+  files.forEach(f => readFile(f));
+});
+</script>
+</body>
+</html>
